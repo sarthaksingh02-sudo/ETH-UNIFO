@@ -1,4 +1,4 @@
-# GD Goenka University — Vidwan Research & Publication Intelligence
+# GD Goenka University Vidwan Research & Publication Intelligence
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![UI](https://img.shields.io/badge/Design-Apple%20VisionOS%20Aesthetic-07152B.svg)](https://gdgoenkauniversity.com/)
@@ -7,7 +7,7 @@
 
 > **Because manually tracking down faculty publications, googling Scopus Quartiles, and copy-pasting DOIs at 2 AM is a special kind of academic torture nobody signed up for.**
 
-Welcome to the **GD Goenka University Vidwan Research Intelligence Platform** — an automated, zero-headache academic bibliometrics engine. Feed it faculty names, sit back with a cup of coffee, and let it scour INFLIBNET Vidwan, cross-reference OpenAlex and Crossref, calculate Scopus Quartiles (Q1–Q4) and H-Indexes, and hand you an audit-ready Excel sheet with clickable links that work everywhere.
+Welcome to the **GD Goenka University Vidwan Research Intelligence Platform** an automated, zero-headache academic bibliometrics engine. Feed it faculty names, sit back with a cup of coffee, and let it scour INFLIBNET Vidwan, cross-reference OpenAlex and Crossref, calculate Scopus Quartiles (Q1–Q4) and H-Indexes, and hand you an audit-ready Excel sheet with clickable links that work everywhere.
 
 ---
 
@@ -22,13 +22,13 @@ python start.py
 ### What happens behind the scenes:
 1. **Zero Setup Drama**: Checks your files, installs no surprise junk, and creates your input template automatically if you don't already have one.
 2. **Port Collisions Solved**: If port `5000` is being stubborn, it quietly finds another open port instead of crashing with an ugly error.
-3. **Browser Auto-Launch**: Launches your default browser and opens the dashboard for you — because typing `http://localhost:5000` is one step too many.
+3. **Browser Auto-Launch**: Launches your default browser and opens the dashboard for you because typing `http://localhost:5000` is one step too many.
 
 ---
 
 ## 🖥️ Using the Web Dashboard (The Visual Way)
 
-The web dashboard is designed with an Apple-inspired midnight navy and frosted glass aesthetic — zero ugly emojis, zero clutter, and zero Microsoft Office subscription required.
+The web dashboard is designed with an Apple-inspired midnight navy and frosted glass aesthetic zero ugly emojis, zero clutter, and zero Microsoft Office subscription required.
 
 ### 1. 👥 Faculty Roster
 - **Add Faculty**: Type a professor's name, hit enter. Done. It saves straight into `faculty_input.xlsx`.
@@ -113,13 +113,13 @@ Every generated report contains **23 clean, audit-ready columns** with native cl
 We know what usually breaks scraping and data automation tools, so we designed around it:
 
 1. **"I Forgot I Had Excel Open" Protection**: 
-   If you have `faculty_publications_output.xlsx` currently open on your desktop, Windows locks the file. Instead of crashing and burning after 10 minutes of scraping, the system detects this and saves your work safely as `faculty_publications_output (1).xlsx`. Your data is never lost.
+  If you have `faculty_publications_output.xlsx` currently open on your desktop, Windows locks the file. Instead of crashing and burning after 10 minutes of scraping, the system detects this and saves your work safely as `faculty_publications_output (1).xlsx`. Your data is never lost.
 2. **The "Empty Profile" Fallback**: 
-   If a faculty member registered on Vidwan but forgot to add their publications, the engine automatically falls back to Crossref's author-affiliation search to hunt down their papers anyway.
+  If a faculty member registered on Vidwan but forgot to add their publications, the engine automatically falls back to Crossref's author-affiliation search to hunt down their papers anyway.
 3. **Identity Disambiguation**: 
-   Ensures that an assistant professor named "Amit Sharma" at GD Goenka isn't credited with 400 papers written by an Amit Sharma at IIT Bombay.
+  Ensures that an assistant professor named "Amit Sharma" at GD Goenka isn't credited with 400 papers written by an Amit Sharma at IIT Bombay.
 4. **All Links Work Everywhere**: 
-   Hyperlinks are stored as native OpenXML relationships, so they remain clickable whether you open the file in Microsoft Excel, Google Sheets, Apple Numbers, LibreOffice, or a free mobile viewer.
+  Hyperlinks are stored as native OpenXML relationships, so they remain clickable whether you open the file in Microsoft Excel, Google Sheets, Apple Numbers, LibreOffice, or a free mobile viewer.
 
 ---
 
