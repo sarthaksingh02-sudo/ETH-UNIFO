@@ -1,0 +1,322 @@
+/* ==========================================================================
+   GD GOENKA UNIVERSITY — APPLE VISION / macOS GLASSMORPHISM DESIGN SYSTEM
+   Theme: Deep Navy Blue (#07152B) & Pure White Glassmorphism
+   ========================================================================== */
+
+:root {
+  /* Deep Navy Canvas Palette */
+  --navy-bg-base: #07152B;
+  --navy-bg-gradient: radial-gradient(circle at 50% -10%, #153A7B 0%, #0B1E3F 45%, #07152B 85%);
+  --navy-surface: #0A1C38;
+  --navy-surface-light: #102A54;
+
+  /* Pure White Glassmorphism Tokens */
+  --glass-card: rgba(255, 255, 255, 0.07);
+  --glass-card-hover: rgba(255, 255, 255, 0.11);
+  --glass-card-active: rgba(255, 255, 255, 0.14);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-hover: rgba(255, 255, 255, 0.32);
+  --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+
+  /* Deep Diffused Ambient Shadows */
+  --shadow-glass-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-glass-md: 0 12px 32px -4px rgba(0, 0, 0, 0.35);
+  --shadow-glass-lg: 0 24px 50px -8px rgba(0, 0, 0, 0.5);
+  --shadow-glow-gold: 0 0 32px rgba(197, 168, 92, 0.25);
+  --shadow-glow-blue: 0 0 32px rgba(59, 130, 246, 0.3);
+
+  /* High-Contrast Apple Typography Hierarchy */
+  --text-primary: #FFFFFF;          /* Pure crisp white */
+  --text-secondary: #94A8C8;        /* Soft slate-blue for comfortable reading */
+  --text-tertiary: #64748B;         /* Slate-500 */
+  --text-muted: #475569;            /* Slate-600 */
+  
+  /* Brand Accent Colors */
+  --accent-gold: #C5A85C;           /* Falcon Wing Gold */
+  --accent-gold-light: #E0C87E;
+  --accent-blue: #3B82F6;           /* Electric Apple Blue */
+  --accent-blue-hover: #60A5FA;
+
+  /* Typography & Radius Tokens */
+  --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif;
+  --tracking-tight: -0.028em;
+  --tracking-normal: -0.012em;
+  --tracking-wide: 0.06em;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 22px;
+  --radius-full: 9999px;
+
+  --transition-apple: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--navy-bg-base);
+  background-image: var(--navy-bg-gradient);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.55;
+  overflow-x: hidden;
+}
+
+/* Minimalist Dark Glass Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ==========================================================================
+   Pure White Glassmorphism Cards
+   ========================================================================== */
+.apple-glass-card {
+  background: var(--glass-card);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--glass-specular), var(--shadow-glass-md);
+  transition: var(--transition-apple);
+}
+
+.apple-glass-card:hover {
+  background: var(--glass-card-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-specular), var(--shadow-glass-lg);
+  transform: translateY(-2px);
+}
+
+/* Header Glass Bar */
+.apple-glass-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(7, 21, 43, 0.75);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: var(--transition-apple);
+}
+
+/* Apple Segmented Capsule Control */
+.apple-glass-segmented {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 5px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  gap: 4px;
+}
+
+.apple-glass-segment-btn {
+  padding: 8px 20px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition-apple);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.apple-glass-segment-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.apple-glass-segment-btn.active {
+  background: #FFFFFF;
+  color: #07152B;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   Buttons (Pure White / Electric Blue / Frosted Glass)
+   ========================================================================== */
+.btn-apple-white {
+  background: #FFFFFF;
+  color: #07152B;
+  border: none;
+  padding: 10px 24px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 18px rgba(255, 255, 255, 0.22), 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: var(--transition-apple);
+  text-decoration: none;
+}
+
+.btn-apple-white:hover {
+  background: #F1F5F9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(255, 255, 255, 0.35);
+}
+
+.btn-apple-white:active {
+  transform: scale(0.98);
+}
+
+.btn-apple-white:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-apple-glass {
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 9px 20px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: var(--transition-apple);
+  text-decoration: none;
+}
+
+.btn-apple-glass:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-apple-glass:active {
+  transform: scale(0.98);
+}
+
+/* Glass Inputs */
+.apple-glass-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-xl);
+  padding: 11px 18px;
+  font-size: 0.88rem;
+  color: #FFFFFF;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: var(--transition-apple);
+  outline: none;
+}
+
+.apple-glass-input::placeholder {
+  color: rgba(148, 168, 200, 0.7);
+}
+
+.apple-glass-input:focus {
+  border-color: var(--accent-blue-hover);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+/* ==========================================================================
+   Luminous Glowing Quartile Badges
+   ========================================================================== */
+.badge-q1 {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  font-weight: 700;
+  font-size: 0.76rem;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.35);
+}
+
+.badge-q2 {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60A5FA;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  font-weight: 700;
+  font-size: 0.76rem;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.35);
+}
+
+.badge-q3 {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FBBF24;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  font-weight: 700;
+  font-size: 0.76rem;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.badge-q4 {
+  background: rgba(249, 115, 22, 0.2);
+  color: #FB923C;
+  border: 1px solid rgba(251, 146, 60, 0.45);
+  font-weight: 700;
+  font-size: 0.76rem;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.badge-none {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94A3B8;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-weight: 600;
+  font-size: 0.76rem;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* Luminous Glow Animation */
+@keyframes appleGlow {
+  0% { opacity: 0.65; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0.65; transform: scale(0.98); }
+}
+
+.ambient-halo {
+  animation: appleGlow 4s infinite ease-in-out;
+}
