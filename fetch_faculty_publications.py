@@ -851,11 +851,11 @@ def write_records_to_styled_excel(records: list[dict], output_path: str):
     custom palette fills, hyperlinks, and auto-filters.
     """
     wb = openpyxl.Workbook()
-    wb.properties.creator = "Sarthak Singh- 3096-2023-27"
-    wb.properties.lastModifiedBy = "Sarthak Singh- 3096-2023-27"
+    wb.properties.creator = "GD Goenka University"
+    wb.properties.lastModifiedBy = "Vidwan Research Intelligence System"
     wb.properties.title = "GD Goenka University - Vidwan Research Intelligence Report"
     wb.properties.subject = "Academic Publication Bibliometrics & Scopus Analysis"
-    wb.properties.description = "Automated OpenXML Research Pipeline. System Architecture: Sarthak Singh- 3096-2023-27"
+    wb.properties.description = "Automated OpenXML Research Pipeline"
     ws = wb.active
     ws.title = "Faculty Publications"
     ws.views.sheetView[0].showGridLines = True
