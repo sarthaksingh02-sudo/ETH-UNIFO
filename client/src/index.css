@@ -320,3 +320,70 @@ body {
 .ambient-halo {
   animation: appleGlow 4s infinite ease-in-out;
 }
+
+/* ==========================================================================
+   Document Type & Standard Academic Identifier Badges
+   ========================================================================== */
+.badge-doc-book {
+  background: rgba(234, 179, 8, 0.18);
+  color: #FDE047;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  font-weight: 700;
+  font-size: 0.70rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-doc-conf {
+  background: rgba(168, 85, 247, 0.18);
+  color: #C084FC;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  font-weight: 700;
+  font-size: 0.70rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-doc-journal {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93C5FD;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  font-weight: 700;
+  font-size: 0.70rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-doc-patent {
+  background: rgba(239, 68, 68, 0.18);
+  color: #FCA5A5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-weight: 700;
+  font-size: 0.70rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.id-pill {
+  font-size: 0.72rem;
+  font-family: 'SF Mono', Menlo, Consolas, Monaco, monospace;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

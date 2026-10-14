@@ -76,35 +76,38 @@ python fetch_faculty_publications.py --institution "GD Goenka University" --dela
 
 ---
 
-## 📊 What You Get in Your Excel Sheet (The 23 Columns)
+## 📊 What You Get in Your Excel Sheet (The 26 Columns)
 
-Every generated report contains **23 clean, audit-ready columns** with native clickable links and color-coded Scopus Quartile highlights:
+Every generated report contains **26 clean, audit-ready columns** with native OpenXML clickable links, color-coded Scopus Quartile highlights, and dedicated identifiers for books, conferences, and patents:
 
 | # | Column Name | What's Inside |
 |---|---|---|
 | 1 | **Faculty Name** | Full name of the faculty member |
 | 2 | **Qualifications** | Highest degrees & awarding universities extracted from Vidwan |
 | 3 | **Vidwan Profile Link** | Direct clickable link to the official Vidwan profile |
-| 4 | **Article Title** | Title of the research publication |
-| 5 | **Authors & Affiliation** | Co-authors and institutional affiliations |
-| 6 | **Journal Name** | Verified publishing journal name |
-| 7 | **ISSN** | 8-character journal serial number (`XXXX-XXXX`) |
-| 8 | **Year** | Year of publication |
-| 9 | **Month** | Month of publication |
-| 10 | **Vol** | Volume number |
-| 11 | **Issue** | Issue number |
-| 12 | **Page No.** | Page range (e.g. `102-118`) |
-| 13 | **Journal Homepage** | Direct link to the journal's official publisher page |
-| 14 | **Indexing Status** | Scopus Verification & SCI/SCIE confirmation |
-| 15 | **Scopus Quartile (Q1–Q4)** | Color-coded badge (Q1 Green, Q2 Blue, Q3 Yellow, Q4 Orange) |
-| 16 | **Journal H-Index** | Scopus/SCImago journal prestige metric |
-| 17 | **Article Citations** | Live citation count from OpenAlex |
-| 18 | **Clarivate MJL Proof** | Master Journal List search proof link |
-| 19 | **Scopus Proof Link** | Direct link to Scopus Source page |
-| 20 | **SCImago Proof Link** | Direct link to SCImago SJR profile |
-| 21 | **Article DOI** | Clickable `https://doi.org/...` link |
-| 22 | **Original Input Link** | Canonical reference link |
-| 23 | **Status** | Confirmation status (`Success` or notes) |
+| 4 | **Document Type** | Classification (`Journal Article`, `Book Chapter`, `Conference Paper`, `Book`, `Patent`) |
+| 5 | **Article Title** | Title of the research publication, chapter, or patent |
+| 6 | **Authors & Affiliation** | Co-authors and institutional affiliations |
+| 7 | **Journal Name** | Publishing journal, book volume, or conference series name |
+| 8 | **ISSN** | 8-character journal serial number (`XXXX-XXXX`) |
+| 9 | **ISBN** | International Standard Book Number for Books, Chapters & Conferences (`978-...`) |
+| 10 | **ISPN** | International Standard Publication Number / Patent Application ID |
+| 11 | **Year** | Year of publication or filing |
+| 12 | **Month** | Month of publication |
+| 13 | **Vol** | Volume number |
+| 14 | **Issue** | Issue number |
+| 15 | **Page No.** | Page range (e.g. `102-118`) |
+| 16 | **Journal Homepage** | Direct link to the journal or publisher's official page |
+| 17 | **Indexing Status** | Scopus Verification, SCI/SCIE confirmation, or ISBN Indexing |
+| 18 | **Scopus Quartile (Q1–Q4)** | Color-coded badge (Q1 Green, Q2 Blue, Q3 Yellow, Q4 Orange) |
+| 19 | **Journal H-Index** | Scopus/SCImago journal prestige metric |
+| 20 | **Article Citations** | Live citation count from OpenAlex / Crossref |
+| 21 | **Clarivate MJL Proof** | Master Journal List search proof link |
+| 22 | **Scopus Proof Link** | Direct link to Scopus Source or verification page |
+| 23 | **SCImago Proof Link** | Direct link to SCImago SJR profile |
+| 24 | **Article DOI** | Clickable `https://doi.org/...` link |
+| 25 | **Original Input Link** | Canonical reference link |
+| 26 | **Status** | Confirmation status (`Success` or notes) |
 
 ---
 

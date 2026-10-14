@@ -278,10 +278,13 @@ def get_publications_preview():
             "Faculty Name": "Faculty_Name",
             "Qualifications": "Qualifications",
             "Vidwan Profile Link": "Vidwan_Profile_Link",
+            "Document Type": "Document_Type",
             "Article Title": "Article_Title",
             "Authors & Affiliation": "Authors_and_Affiliations",
             "Journal Name": "Journal_Name",
             "ISSN": "ISSN",
+            "ISBN": "ISBN",
+            "ISPN": "ISPN",
             "Year": "Year",
             "Month": "Month",
             "Vol": "Volume",
@@ -327,6 +330,9 @@ def get_publications_preview():
                 else:
                     row_data[clean_key] = cell_val if cell_val is not None else "-"
 
+            row_data.setdefault("Document_Type", "Journal Article")
+            row_data.setdefault("ISBN", "-")
+            row_data.setdefault("ISPN", "-")
             records.append(row_data)
 
         wb.close()

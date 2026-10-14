@@ -261,11 +261,70 @@ def resolve_doi_by_title(title: str) -> str | None:
     return None
 
 
+def scrape_vidwan_patents(purl: str, session: requests.Session | None = None) -> list[dict]:
+    """
+    Extracts registered patent information from the Vidwan profile page (#patents_pane) if available.
+    """
+    s = session or requests.Session()
+    patents = []
+    try:
+        resp = s.get(purl, headers=BROWSER_HEADERS, timeout=TIMEOUT)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        pane = soup.select_one("#patents_pane")
+        if not pane or "no data found" in pane.text.lower():
+            return []
+
+        # Find patent cards or items
+        items = pane.find_all(class_=lambda c: c and any(k in c for k in ["custom_patent_card", "patent_card", "card", "patent-item"]))
+        if not items:
+            items = pane.find_all("div", class_="card")
+
+        for it in items:
+            title_el = it.find(class_=lambda c: c and "title" in c) or it.find(["h4", "h5", "strong"])
+            title = title_el.text.strip() if title_el else ""
+            txt = it.text.strip()
+
+            # Application / Patent number (ISPN)
+            ispn = ""
+            m_app = re.search(r"(?:Application\s*(?:No\.?|Number)|Patent\s*(?:No\.?|Number)|ISPN)[:\s]*([A-Za-z0-9\-_/.]+)", txt, re.IGNORECASE)
+            if m_app:
+                ispn = m_app.group(1).strip()
+            else:
+                m_num = re.search(r"\b(\d{10,15}|[A-Z]{2}\d+[A-Z0-9]*)\b", txt)
+                if m_num:
+                    ispn = m_num.group(1).strip()
+
+            year = ""
+            m_yr = re.search(r"\b(19\d{2}|20\d{2})\b", txt)
+            if m_yr:
+                year = m_yr.group(1)
+
+            status = "Patent Filed / Published"
+            if "grant" in txt.lower():
+                status = "Patent Granted"
+            elif "publish" in txt.lower():
+                status = "Patent Published"
+
+            if title or ispn:
+                patents.append({
+                    "title": title or f"Patent Application {ispn}",
+                    "ispn": ispn or "-",
+                    "year": year or "",
+                    "status": status,
+                    "details": txt[:200]
+                })
+    except Exception:
+        pass
+    return patents
+
+
 def scrape_vidwan_publications(
     profile_id: str, session: requests.Session | None = None
 ) -> list[dict]:
     """
-    Extracts publications and DOIs from Vidwan's AJAX endpoint.
+    Extracts publications, DOIs, document types, ISBNs, and ISPNs from Vidwan's AJAX endpoint.
     GET https://vidwan.inflibnet.ac.in/profile/{profile_id}?page={page}
     """
     s = session or requests.Session()
@@ -304,6 +363,26 @@ def scrape_vidwan_publications(
                 title_el = card.find(class_=lambda c: c and "custom_pub_title" in c)
                 title = title_el.text.strip() if title_el else ""
 
+                # Document Type Badge
+                type_el = card.find(class_=lambda c: c and "custom_pub_type" in c)
+                doc_type = type_el.text.strip() if type_el else ""
+
+                card_text = card.text.strip()
+
+                # Scrape ISBN from card text / journal details
+                card_isbn = ""
+                m_isbn = re.search(r"(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][-\s]?)?(?:\d[-\s]?){9}[\dXx])", card_text, re.IGNORECASE)
+                if m_isbn:
+                    clean_isbn = re.sub(r"[^0-9Xx]", "", m_isbn.group(1))
+                    if len(clean_isbn) in [10, 13]:
+                        card_isbn = m_isbn.group(1).strip()
+
+                # Scrape ISPN / Patent number from card text
+                card_ispn = ""
+                m_ispn = re.search(r"(?:ISPN[:#\s-]*|Patent\s*(?:No\.?|Number|App(?:lication)?\.?\s*No\.?)[:#\s-]*)([A-Za-z0-9\-_/.]+)", card_text, re.IGNORECASE)
+                if m_ispn:
+                    card_ispn = m_ispn.group(1).strip()
+
                 doi = ""
                 doi_link = card.find("a", href=re.compile(r"doi\.org/"))
                 if doi_link:
@@ -327,7 +406,11 @@ def scrape_vidwan_publications(
                 publications.append({
                     "title": title,
                     "doi": doi,
-                    "raw_url": f"https://doi.org/{doi}" if doi else ""
+                    "raw_url": f"https://doi.org/{doi}" if doi else "",
+                    "doc_type": doc_type,
+                    "card_isbn": card_isbn,
+                    "card_ispn": card_ispn,
+                    "card_text": card_text,
                 })
 
             total = data.get("total")
@@ -381,11 +464,26 @@ def search_crossref_author_publications(
                     titles = it.get("title", [])
                     title = titles[0] if titles else "Untitled"
                     clean_title = re.sub(r"<[^>]+>", "", title).strip()
+                    cr_type = it.get("type", "")
+                    doc_t = "Journal Article"
+                    if "chapter" in cr_type:
+                        doc_t = "Book Chapter"
+                    elif "proceedings" in cr_type:
+                        doc_t = "Conference Paper"
+                    elif "book" in cr_type or "monograph" in cr_type:
+                        doc_t = "Book"
+                    cr_isbns = it.get("ISBN", [])
+                    isbn_val = " / ".join(cr_isbns) if isinstance(cr_isbns, list) else str(cr_isbns)
+
                     if doi:
                         publications.append({
                             "title": clean_title,
                             "doi": doi,
-                            "raw_url": f"https://doi.org/{doi}"
+                            "raw_url": f"https://doi.org/{doi}",
+                            "doc_type": doc_t,
+                            "card_isbn": isbn_val,
+                            "card_ispn": "",
+                            "card_text": clean_title
                         })
     except Exception:
         pass
@@ -522,17 +620,27 @@ def fetch_source_details(source_id_url: str, issn: str) -> dict:
     return metrics
 
 
-def process_article(raw_link: str) -> dict:
+def process_article(
+    raw_link: str,
+    hint_doc_type: str = "",
+    card_isbn: str = "",
+    card_ispn: str = "",
+    title_hint: str = ""
+) -> dict:
     """
-    Extracts all requested academic parameters for a given link or DOI.
+    Extracts all requested academic parameters for a given link or DOI,
+    enriching with OpenAlex, Crossref, and dedicated ISBN/ISPN/Document Type scrapers.
     """
     record = {
         "Input_URL": str(raw_link).strip(),
         "DOI": "",
-        "Article_Title": "",
+        "Document_Type": hint_doc_type or "Journal Article",
+        "Article_Title": title_hint or "",
         "Authors_and_Affiliations": "",
         "Journal_Name": "",
         "ISSN": "",
+        "ISBN": card_isbn or "-",
+        "ISPN": card_ispn or "-",
         "Year": "",
         "Month": "",
         "Volume": "",
@@ -556,18 +664,41 @@ def process_article(raw_link: str) -> dict:
 
     record["DOI"] = doi
 
-    # 1. Fetch from OpenAlex
+    # 1. Fetch metadata from OpenAlex & Crossref in tandem
     oa_data = fetch_openalex_metadata(doi)
-    cr_data = {}
-    if not oa_data:
-        cr_data = fetch_crossref_metadata(doi)
+    cr_data = fetch_crossref_metadata(doi)
 
     if not oa_data and not cr_data:
         record["Fetch_Status"] = "Metadata not found in registries"
         return record
 
+    # Determine Document / Publication Type
+    doc_type = hint_doc_type.strip() if hint_doc_type else ""
+    cr_t = (cr_data.get("type") or "").lower() if cr_data else ""
+    oa_t = (oa_data.get("type") or "").lower() if oa_data else ""
+    if not doc_type:
+        if "chapter" in cr_t or "chapter" in oa_t:
+            doc_type = "Book Chapter"
+        elif "proceedings" in cr_t or "conference" in oa_t:
+            doc_type = "Conference Paper"
+        elif "book" in cr_t or "monograph" in cr_t or "book" in oa_t:
+            doc_type = "Book"
+        elif "posted-content" in cr_t or "preprint" in oa_t:
+            doc_type = "Preprint"
+        elif "dataset" in cr_t or "data" in oa_t:
+            doc_type = "Dataset"
+        elif "article" in cr_t or "article" in oa_t:
+            doc_type = "Journal Article"
+        else:
+            doc_type = "Journal Article"
+    record["Document_Type"] = doc_type
+
     # Parse Title
-    title = oa_data.get("title") or (cr_data.get("title", [None])[0] if cr_data.get("title") else "")
+    title = (
+        (oa_data.get("title") if oa_data else None)
+        or (cr_data.get("title", [None])[0] if cr_data and cr_data.get("title") else None)
+        or title_hint
+    )
     record["Article_Title"] = title or "N/A"
 
     # Parse Authors and Affiliations
@@ -596,32 +727,79 @@ def process_article(raw_link: str) -> dict:
         "; ".join(authors_list) if authors_list else "Not Available"
     )
 
-    # Source / Journal Information
-    source = (oa_data.get("primary_location") or {}).get("source") or {}
-
-    journal_name = source.get("display_name")
-    if not journal_name:
-        journal_name = (
-            cr_data.get("container-title", [""])[0]
-            if cr_data.get("container-title")
-            else ""
-        )
+    # Source / Journal / Publisher Information
+    source = (oa_data.get("primary_location") or {}).get("source") or {} if oa_data else {}
+    journal_name = source.get("display_name") if source else ""
+    if not journal_name and cr_data:
+        cr_ct = cr_data.get("container-title")
+        if cr_ct:
+            journal_name = cr_ct[0] if isinstance(cr_ct, list) else str(cr_ct)
+        elif cr_data.get("publisher"):
+            journal_name = str(cr_data.get("publisher"))
     record["Journal_Name"] = journal_name or "N/A"
 
-    # ISSN
-    issn_l = source.get("issn_l")
-    issns = source.get("issn") or cr_data.get("ISSN") or []
+    # ISSN Extraction
+    issn_l = source.get("issn_l") if source else None
+    issns = (source.get("issn") if source else []) or (cr_data.get("ISSN") if cr_data else []) or []
     primary_issn = issn_l if issn_l else (issns[0] if issns else "")
-    record["ISSN"] = primary_issn or (" / ".join(issns) if issns else "N/A")
+    record["ISSN"] = primary_issn or (" / ".join(issns) if issns else "-")
+
+    # ISBN Extraction (for Book, Book Chapter, Conference Proceedings)
+    isbns = []
+    if card_isbn and card_isbn != "-":
+        isbns.append(card_isbn.strip())
+
+    if cr_data:
+        cr_isbn = cr_data.get("ISBN")
+        if cr_isbn:
+            if isinstance(cr_isbn, list):
+                for x in cr_isbn:
+                    val = str(x).strip()
+                    if val and val not in isbns:
+                        isbns.append(val)
+            elif str(cr_isbn).strip() not in isbns:
+                isbns.append(str(cr_isbn).strip())
+
+        for it in cr_data.get("isbn-type", []):
+            val = it.get("value")
+            if val and str(val).strip() not in isbns:
+                isbns.append(str(val).strip())
+
+    if oa_data:
+        src = (oa_data.get("primary_location") or {}).get("source") or {}
+        oa_isbns = src.get("isbns") or oa_data.get("isbns") or []
+        for x in oa_isbns:
+            val = str(x).strip()
+            if val and val not in isbns:
+                isbns.append(val)
+
+    # Check if ISBN is directly embedded in DOI (common for Springer, Elsevier, CRC Press chapters)
+    if not isbns and doi:
+        m_doi_isbn = re.search(r"(97[89][0-9Xx-]{10,15})", doi)
+        if m_doi_isbn:
+            clean_c = re.sub(r"[^0-9Xx]", "", m_doi_isbn.group(1))
+            if len(clean_c) in [10, 13]:
+                isbns.append(m_doi_isbn.group(1))
+
+    record["ISBN"] = " / ".join(isbns) if isbns else "-"
+
+    # ISPN / Patent Number Extraction
+    ispn_val = card_ispn if (card_ispn and card_ispn != "-") else ""
+    if not ispn_val and cr_data:
+        for alt in cr_data.get("alternative-id", []):
+            if "ispn" in str(alt).lower():
+                ispn_val = str(alt).strip()
+                break
+    record["ISPN"] = ispn_val if ispn_val else "-"
 
     # Source-level H-Index and Homepage via OpenAlex Sources API
-    source_id_url = source.get("id")
+    source_id_url = source.get("id") if source else None
     source_details = fetch_source_details(source_id_url, primary_issn)
 
     record["Journal_Homepage"] = (
         source_details.get("homepage")
         if source_details.get("homepage") != "N/A"
-        else (source.get("homepage_url") or "N/A")
+        else ((source.get("homepage_url") if source else None) or "N/A")
     )
     record["Journal_H_Index"] = source_details.get("h_index", "N/A")
 
@@ -640,30 +818,32 @@ def process_article(raw_link: str) -> dict:
     record["Scopus_Quartile"] = quartile
 
     # Dates: Year & Month
-    pub_year = oa_data.get("publication_year") or cr_data.get("published-print", {}).get(
-        "date-parts", [[None]]
-    )[0][0]
+    pub_year = (
+        (oa_data.get("publication_year") if oa_data else None)
+        or (cr_data.get("published-print", {}).get("date-parts", [[None]])[0][0] if cr_data else None)
+        or (cr_data.get("published-online", {}).get("date-parts", [[None]])[0][0] if cr_data else None)
+    )
     record["Year"] = pub_year if pub_year else ""
 
-    pub_date = oa_data.get("publication_date") or ""
+    pub_date = (oa_data.get("publication_date") if oa_data else "") or ""
     month_val = ""
     if pub_date and "-" in pub_date:
         parts = pub_date.split("-")
         if len(parts) > 1 and parts[1].isdigit():
             m_int = int(parts[1])
             month_val = MONTH_NAMES.get(m_int, parts[1])
-    elif cr_data.get("created", {}).get("date-parts"):
+    elif cr_data and cr_data.get("created", {}).get("date-parts"):
         dp = cr_data["created"]["date-parts"][0]
         if len(dp) > 1 and isinstance(dp[1], int):
             month_val = MONTH_NAMES.get(dp[1], str(dp[1]))
     record["Month"] = month_val
 
     # Biblio: Vol, Issue, Page
-    biblio = oa_data.get("biblio") or {}
-    record["Volume"] = biblio.get("volume") or cr_data.get("volume") or ""
-    record["Issue"] = biblio.get("issue") or cr_data.get("issue") or ""
+    biblio = oa_data.get("biblio") or {} if oa_data else {}
+    record["Volume"] = biblio.get("volume") or (cr_data.get("volume") if cr_data else "") or ""
+    record["Issue"] = biblio.get("issue") or (cr_data.get("issue") if cr_data else "") or ""
 
-    first_p = biblio.get("first_page") or cr_data.get("page", "")
+    first_p = biblio.get("first_page") or (cr_data.get("page", "") if cr_data else "")
     last_p = biblio.get("last_page")
     if first_p and last_p and first_p != last_p:
         record["Page_No"] = f"{first_p}-{last_p}"
@@ -671,10 +851,10 @@ def process_article(raw_link: str) -> dict:
         record["Page_No"] = first_p if first_p else ""
 
     # Citations
-    cites = oa_data.get("cited_by_count")
-    if cites is None:
+    cites = oa_data.get("cited_by_count") if oa_data else None
+    if cites is None and cr_data:
         cites = cr_data.get("is-referenced-by-count", 0)
-    record["Article_Citations"] = cites
+    record["Article_Citations"] = cites if cites is not None else 0
 
     # Indexing Proof Links
     if primary_issn:
@@ -683,8 +863,13 @@ def process_article(raw_link: str) -> dict:
         record["Scopus_Proof_Link"] = f"https://www.scopus.com/sourceid/sourceInfo.uri?issn={clean_issn}"
         record["SCImago_Proof_Link"] = f"https://www.scimagojr.com/journalsearch.php?q={clean_issn}"
         record["Indexing_Status"] = "Scopus Verified | SCI/SCIE (Verify on Clarivate MJL)"
+    elif record["ISBN"] != "-":
+        record["Indexing_Status"] = f"ISBN Indexed ({record['Document_Type']})"
+        record["Clarivate_MJL_Proof_Link"] = "N/A"
+        record["Scopus_Proof_Link"] = "https://www.scopus.com/search/form.uri?display=basic#basic"
+        record["SCImago_Proof_Link"] = "N/A"
     else:
-        record["Indexing_Status"] = "No ISSN Available"
+        record["Indexing_Status"] = f"{record['Document_Type']}" if record["Document_Type"] != "Journal Article" else "No ISSN/ISBN Available"
         record["Clarivate_MJL_Proof_Link"] = "N/A"
         record["Scopus_Proof_Link"] = "N/A"
         record["SCImago_Proof_Link"] = "N/A"
@@ -702,7 +887,7 @@ def process_faculty(
     session: requests.Session | None = None,
 ) -> list[dict]:
     """
-    Coordinates searching Vidwan, scraping qualifications and publications,
+    Coordinates searching Vidwan, scraping qualifications, publications, and patents,
     with automatic Crossref author fallback when Vidwan has 0 publications,
     and enriching every publication through process_article().
     """
@@ -719,8 +904,10 @@ def process_faculty(
             for p_idx, pub in enumerate(cr_pubs, start=1):
                 doi = pub.get("doi")
                 title = pub.get("title", "Untitled")
-                print(f"       [{p_idx}/{len(cr_pubs)}] Processing: {title[:40]}... (DOI: {doi})")
-                rec = process_article(doi)
+                doc_t = pub.get("doc_type", "Journal Article")
+                isbn_hint = pub.get("card_isbn", "")
+                print(f"       [{p_idx}/{len(cr_pubs)}] Processing ({doc_t}): {title[:40]}... (DOI: {doi})")
+                rec = process_article(doi, hint_doc_type=doc_t, card_isbn=isbn_hint)
                 rec["Faculty_Name"] = clean_name
                 rec["Qualifications"] = "Not Available on Vidwan"
                 rec["Vidwan_Profile_Link"] = "N/A"
@@ -732,12 +919,15 @@ def process_faculty(
             "Faculty_Name": clean_name,
             "Qualifications": "N/A",
             "Vidwan_Profile_Link": "N/A",
+            "Document_Type": "-",
             "Input_URL": "N/A",
             "DOI": "-",
             "Article_Title": "Faculty Profile Not Found on Vidwan",
             "Authors_and_Affiliations": clean_name,
             "Journal_Name": "-",
             "ISSN": "-",
+            "ISBN": "-",
+            "ISPN": "-",
             "Year": "-",
             "Month": "-",
             "Volume": "-",
@@ -772,17 +962,25 @@ def process_faculty(
         if pubs:
             print(f"       -> Found {len(pubs)} publication(s) via Crossref index!")
 
-    if not pubs:
+    # 4. Scrape Patents from Vidwan Patents Pane if present
+    patents = scrape_vidwan_patents(purl, session=session)
+    if patents:
+        print(f"       -> Extracted {len(patents)} registered patent(s) from Vidwan.")
+
+    if not pubs and not patents:
         return [{
             "Faculty_Name": clean_name,
             "Qualifications": qualifications,
             "Vidwan_Profile_Link": purl,
+            "Document_Type": "-",
             "Input_URL": purl,
             "DOI": "-",
             "Article_Title": "No publications listed on Vidwan or Crossref",
             "Authors_and_Affiliations": clean_name,
             "Journal_Name": "-",
             "ISSN": "-",
+            "ISBN": "-",
+            "ISPN": "-",
             "Year": "-",
             "Month": "-",
             "Volume": "-",
@@ -803,20 +1001,26 @@ def process_faculty(
     for p_idx, pub in enumerate(pubs, start=1):
         doi = pub.get("doi")
         title = pub.get("title") or "Untitled"
-        print(f"       [{p_idx}/{len(pubs)}] Processing: {title[:40]}... (DOI: {doi or 'None'})")
+        doc_type = pub.get("doc_type") or ""
+        card_isbn = pub.get("card_isbn") or ""
+        card_ispn = pub.get("card_ispn") or ""
+        print(f"       [{p_idx}/{len(pubs)}] Processing ({doc_type or 'Pub'}): {title[:40]}... (DOI: {doi or 'None'})")
 
         if doi:
-            rec = process_article(doi)
+            rec = process_article(doi, hint_doc_type=doc_type, card_isbn=card_isbn, card_ispn=card_ispn, title_hint=title)
             if not rec.get("Article_Title") or rec.get("Article_Title") == "N/A":
                 rec["Article_Title"] = title
         else:
             rec = {
                 "Input_URL": pub.get("raw_url") or purl,
                 "DOI": "-",
+                "Document_Type": doc_type or "Publication",
                 "Article_Title": title,
                 "Authors_and_Affiliations": clean_name,
                 "Journal_Name": "-",
                 "ISSN": "-",
+                "ISBN": card_isbn or "-",
+                "ISPN": card_ispn or "-",
                 "Year": "-",
                 "Month": "-",
                 "Volume": "-",
@@ -826,7 +1030,7 @@ def process_faculty(
                 "Article_Citations": "-",
                 "Journal_H_Index": "N/A",
                 "Scopus_Quartile": "None",
-                "Indexing_Status": "No ISSN Available",
+                "Indexing_Status": f"ISBN Indexed ({doc_type})" if card_isbn else "No ISSN/ISBN Available",
                 "Clarivate_MJL_Proof_Link": "N/A",
                 "Scopus_Proof_Link": "N/A",
                 "SCImago_Proof_Link": "N/A",
@@ -839,6 +1043,37 @@ def process_faculty(
         records.append(rec)
         time.sleep(0.3)
 
+    # Append any registered patents from Vidwan
+    for pat in patents:
+        records.append({
+            "Faculty_Name": clean_name,
+            "Qualifications": qualifications,
+            "Vidwan_Profile_Link": purl,
+            "Document_Type": "Patent",
+            "Input_URL": purl,
+            "DOI": "-",
+            "Article_Title": pat.get("title", "Patent Application"),
+            "Authors_and_Affiliations": clean_name,
+            "Journal_Name": "Patent Office",
+            "ISSN": "-",
+            "ISBN": "-",
+            "ISPN": pat.get("ispn", "-"),
+            "Year": pat.get("year", "-"),
+            "Month": "-",
+            "Volume": "-",
+            "Issue": "-",
+            "Page_No": "-",
+            "Journal_Homepage": "N/A",
+            "Article_Citations": "-",
+            "Journal_H_Index": "N/A",
+            "Scopus_Quartile": "None",
+            "Indexing_Status": pat.get("status", "Patent Registered"),
+            "Clarivate_MJL_Proof_Link": "N/A",
+            "Scopus_Proof_Link": "N/A",
+            "SCImago_Proof_Link": "N/A",
+            "Fetch_Status": "Success"
+        })
+
     return records
 
 
@@ -847,8 +1082,8 @@ def process_faculty(
 # ==========================================
 def write_records_to_styled_excel(records: list[dict], output_path: str):
     """
-    Exports enriched academic records to an Excel workbook with 23 columns,
-    custom palette fills, hyperlinks, and auto-filters.
+    Exports enriched academic records to an Excel workbook with 26 columns,
+    including Document Type, ISBN, and ISPN, custom palette fills, hyperlinks, and auto-filters.
     """
     wb = openpyxl.Workbook()
     wb.properties.creator = "GD Goenka University"
@@ -860,15 +1095,18 @@ def write_records_to_styled_excel(records: list[dict], output_path: str):
     ws.title = "Faculty Publications"
     ws.views.sheetView[0].showGridLines = True
 
-    # Prepend the 3 new columns and maintain all 20 original columns
+    # Prepend the 3 new columns and maintain all original columns
     columns = [
         ("Faculty Name", "Faculty_Name", 24),
         ("Qualifications", "Qualifications", 36),
         ("Vidwan Profile Link", "Vidwan_Profile_Link", 26),
+        ("Document Type", "Document_Type", 18),
         ("Article Title", "Article_Title", 38),
         ("Authors & Affiliation", "Authors_and_Affiliations", 42),
         ("Journal Name", "Journal_Name", 28),
         ("ISSN", "ISSN", 14),
+        ("ISBN", "ISBN", 22),
+        ("ISPN", "ISPN", 18),
         ("Year", "Year", 9),
         ("Month", "Month", 12),
         ("Vol", "Volume", 8),
@@ -951,8 +1189,8 @@ def write_records_to_styled_excel(records: list[dict], output_path: str):
             cell.alignment = align_left
 
             if key in [
-                "Year", "Month", "Volume", "Issue", "Page_No",
-                "ISSN", "Scopus_Quartile", "Fetch_Status"
+                "Document_Type", "Year", "Month", "Volume", "Issue", "Page_No",
+                "ISSN", "ISBN", "ISPN", "Scopus_Quartile", "Fetch_Status"
             ]:
                 cell.alignment = align_center
             elif key in ["Article_Citations", "Journal_H_Index"]:
@@ -1028,6 +1266,8 @@ def write_records_to_styled_excel(records: list[dict], output_path: str):
         wb.save(alt_path)
         print(f"\n[NOTICE] '{output_path}' is open in Microsoft Excel or another program.")
         print(f"Successfully exported {len(records)} records to alternate file: '{alt_path}'.")
+
+
 
 
 # ==========================================
@@ -1112,12 +1352,15 @@ def main():
                 "Faculty_Name": name,
                 "Qualifications": "Error",
                 "Vidwan_Profile_Link": "N/A",
+                "Document_Type": "-",
                 "Input_URL": "N/A",
                 "DOI": "-",
                 "Article_Title": f"Error: {e}",
                 "Authors_and_Affiliations": name,
                 "Journal_Name": "-",
                 "ISSN": "-",
+                "ISBN": "-",
+                "ISPN": "-",
                 "Year": "-",
                 "Month": "-",
                 "Volume": "-",

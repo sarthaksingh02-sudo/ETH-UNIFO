@@ -251,17 +251,28 @@ export default function App() {
   // Filtered faculty list
   const filteredFaculty = faculty.filter(f => f.toLowerCase().includes(searchQuery.toLowerCase().trim()));
 
-  // Filtered publications
+  // Filtered publications with multi-field search across titles, journals, faculty, and standard IDs (ISBN / ISSN / ISPN)
   const filteredPubs = publications.filter(p => {
     const qMatch = quartileFilter === 'ALL' || (p.Scopus_Quartile || 'None').toUpperCase() === quartileFilter;
-    const sMatch = !pubFilter.trim() || 
-      (p.Article_Title || '').toLowerCase().includes(pubFilter.toLowerCase()) ||
-      (p.Journal_Name || '').toLowerCase().includes(pubFilter.toLowerCase()) ||
-      (p.Faculty_Name || '').toLowerCase().includes(pubFilter.toLowerCase());
+    const term = pubFilter.toLowerCase().trim();
+    const sMatch = !term || 
+      (p.Article_Title || '').toLowerCase().includes(term) ||
+      (p.Journal_Name || '').toLowerCase().includes(term) ||
+      (p.Faculty_Name || '').toLowerCase().includes(term) ||
+      (p.ISSN || '').toLowerCase().includes(term) ||
+      (p.ISBN || '').toLowerCase().includes(term) ||
+      (p.ISPN || '').toLowerCase().includes(term) ||
+      (p.Document_Type || '').toLowerCase().includes(term) ||
+      (p.DOI || '').toLowerCase().includes(term);
     return qMatch && sMatch;
   });
 
   const q1Count = publications.filter(p => (p.Scopus_Quartile || '').toUpperCase() === 'Q1').length;
+  const bookAndConfCount = publications.filter(p => 
+    (p.Document_Type || '').toLowerCase().includes('book') || 
+    (p.Document_Type || '').toLowerCase().includes('conference') ||
+    (p.ISBN && p.ISBN !== '-' && p.ISBN !== 'N/A')
+  ).length;
   const totalCites = publications.reduce((acc, p) => acc + (typeof p.Article_Citations === 'number' ? p.Article_Citations : 0), 0);
 
   return (
@@ -694,7 +705,7 @@ export default function App() {
         {activeTab === 'explorer' && (
           <div>
             {/* Summary Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '20px', marginBottom: '32px' }}>
               <div className="apple-glass-card" style={{ padding: '24px 28px' }}>
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Total Publications</div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: '#FFFFFF', marginTop: '6px', letterSpacing: 'var(--tracking-tight)' }}>{publications.length}</div>
@@ -702,6 +713,10 @@ export default function App() {
               <div className="apple-glass-card" style={{ padding: '24px 28px' }}>
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Q1 Tier Papers</div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: '#34D399', marginTop: '6px', letterSpacing: 'var(--tracking-tight)', textShadow: '0 0 20px rgba(52, 211, 153, 0.35)' }}>{q1Count}</div>
+              </div>
+              <div className="apple-glass-card" style={{ padding: '24px 28px' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Books &amp; Conferences</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#FDE047', marginTop: '6px', letterSpacing: 'var(--tracking-tight)', textShadow: '0 0 20px rgba(253, 224, 71, 0.35)' }}>{bookAndConfCount}</div>
               </div>
               <div className="apple-glass-card" style={{ padding: '24px 28px' }}>
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Cumulative Citations</div>
@@ -752,7 +767,7 @@ export default function App() {
               <div style={{ position: 'relative' }}>
                 <input 
                   type="text" 
-                  placeholder="Search title, journal, or faculty..."
+                  placeholder="Search title, journal, faculty, ISBN, ISPN..."
                   value={pubFilter}
                   onChange={(e) => setPubFilter(e.target.value)}
                   className="apple-glass-input"
@@ -775,8 +790,8 @@ export default function App() {
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
                     <th style={{ padding: '14px 16px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Faculty &amp; Qualifications</th>
-                    <th style={{ padding: '14px 16px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Article Title</th>
-                    <th style={{ padding: '14px 16px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Journal / ISSN</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Publication / Document Title</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Source &amp; Standard IDs (ISSN / ISBN / ISPN)</th>
                     <th style={{ padding: '14px 16px', textAlign: 'center', width: '90px', color: 'var(--text-secondary)', fontWeight: 600 }}>Quartile</th>
                     <th style={{ padding: '14px 16px', textAlign: 'center', width: '80px', color: 'var(--text-secondary)', fontWeight: 600 }}>H-Index</th>
                     <th style={{ padding: '14px 16px', textAlign: 'center', width: '80px', color: 'var(--text-secondary)', fontWeight: 600 }}>Citations</th>
@@ -791,34 +806,67 @@ export default function App() {
                       </td>
                     </tr>
                   ) : (
-                    filteredPubs.map((pub, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)', transition: 'var(--transition-apple)' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                        <td style={{ padding: '16px 18px', verticalAlign: 'top', width: '220px' }}>
-                          <div style={{ fontWeight: 700, color: '#FFFFFF' }}>{pub.Faculty_Name}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{pub.Qualifications}</div>
-                          {pub.Vidwan_Profile_Link && pub.Vidwan_Profile_Link.startsWith('http') && (
-                            <a href={pub.Vidwan_Profile_Link} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-blue-hover)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 600 }}>
-                              Vidwan Profile <IconArrowUpRight size={12} />
-                            </a>
-                          )}
-                        </td>
-                        <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
-                          <div style={{ fontWeight: 600, color: '#FFFFFF', lineHeight: 1.5 }}>{pub.Article_Title}</div>
-                          {pub.DOI && pub.DOI !== '-' && (
-                            <a href={pub.DOI.startsWith('http') ? pub.DOI : `https://doi.org/${pub.DOI}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: '#60A5FA', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 500 }}>
-                              DOI: {pub.DOI} <IconArrowUpRight size={12} />
-                            </a>
-                          )}
-                        </td>
-                        <td style={{ padding: '16px 18px', verticalAlign: 'top', width: '200px' }}>
-                          <div style={{ fontWeight: 600, color: '#FFFFFF' }}>{pub.Journal_Name}</div>
-                          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '3px' }}>ISSN: {pub.ISSN || '-'}</div>
-                          {pub.Journal_Homepage && pub.Journal_Homepage.startsWith('http') && (
-                            <a href={pub.Journal_Homepage} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-blue-hover)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '4px', fontWeight: 600 }}>
-                              Journal Site <IconArrowUpRight size={12} />
-                            </a>
-                          )}
-                        </td>
+                    filteredPubs.map((pub, idx) => {
+                      const docT = (pub.Document_Type || '').toLowerCase();
+                      const badgeClass = docT.includes('book') ? 'badge-doc-book' :
+                                         docT.includes('conf') ? 'badge-doc-conf' :
+                                         docT.includes('patent') ? 'badge-doc-patent' :
+                                         'badge-doc-journal';
+
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)', transition: 'var(--transition-apple)' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                          <td style={{ padding: '16px 18px', verticalAlign: 'top', width: '220px' }}>
+                            <div style={{ fontWeight: 700, color: '#FFFFFF' }}>{pub.Faculty_Name}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{pub.Qualifications}</div>
+                            {pub.Vidwan_Profile_Link && pub.Vidwan_Profile_Link.startsWith('http') && (
+                              <a href={pub.Vidwan_Profile_Link} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-blue-hover)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 600 }}>
+                                Vidwan Profile <IconArrowUpRight size={12} />
+                              </a>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                              <span className={badgeClass}>
+                                {pub.Document_Type || 'Journal Article'}
+                              </span>
+                              {pub.Year && pub.Year !== '-' && (
+                                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                  {pub.Year}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontWeight: 600, color: '#FFFFFF', lineHeight: 1.5 }}>{pub.Article_Title}</div>
+                            {pub.DOI && pub.DOI !== '-' && (
+                              <a href={pub.DOI.startsWith('http') ? pub.DOI : `https://doi.org/${pub.DOI}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: '#60A5FA', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 500 }}>
+                                DOI: {pub.DOI} <IconArrowUpRight size={12} />
+                              </a>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px 18px', verticalAlign: 'top', minWidth: '220px' }}>
+                            <div style={{ fontWeight: 600, color: '#FFFFFF' }}>{pub.Journal_Name}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                              {pub.ISSN && pub.ISSN !== '-' && pub.ISSN !== 'N/A' && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                  ISSN: <span className="id-pill" style={{ color: '#E2E8F0' }}>{pub.ISSN}</span>
+                                </div>
+                              )}
+                              {pub.ISBN && pub.ISBN !== '-' && pub.ISBN !== 'N/A' && (
+                                <div style={{ fontSize: '0.75rem', color: '#FDE047' }}>
+                                  ISBN: <span className="id-pill" style={{ color: '#FEF08A', borderColor: 'rgba(234, 179, 8, 0.35)' }}>{pub.ISBN}</span>
+                                </div>
+                              )}
+                              {pub.ISPN && pub.ISPN !== '-' && pub.ISPN !== 'N/A' && (
+                                <div style={{ fontSize: '0.75rem', color: '#67E8F9' }}>
+                                  ISPN: <span className="id-pill" style={{ color: '#A5F3FC', borderColor: 'rgba(6, 182, 212, 0.35)' }}>{pub.ISPN}</span>
+                                </div>
+                              )}
+                            </div>
+                            {pub.Journal_Homepage && pub.Journal_Homepage.startsWith('http') && (
+                              <a href={pub.Journal_Homepage} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-blue-hover)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 600 }}>
+                                Source Site <IconArrowUpRight size={12} />
+                              </a>
+                            )}
+                          </td>
                         <td style={{ padding: '16px 18px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <span className={`badge-${(pub.Scopus_Quartile || 'none').toLowerCase()}`}>
                             {pub.Scopus_Quartile || 'None'}
@@ -844,7 +892,8 @@ export default function App() {
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
