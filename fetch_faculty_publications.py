@@ -1241,8 +1241,8 @@ def write_records_to_styled_excel(records: list[dict], output_path: str):
 
         for col_idx, (_, key, _) in enumerate(columns, start=1):
             val = rec.get(key, "")
-            if val is None:
-                val = ""
+            if val is None or str(val).strip() in ["", "None", "nan", "null"]:
+                val = "-"
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.border = border_cell
             cell.fill = row_fill
