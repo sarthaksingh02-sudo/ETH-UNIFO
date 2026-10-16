@@ -861,11 +861,16 @@ export default function App() {
                                 </div>
                               )}
                             </div>
-                            {pub.Journal_Homepage && pub.Journal_Homepage.startsWith('http') && (
-                              <a href={pub.Journal_Homepage} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-blue-hover)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 600 }}>
-                                Source Site <IconArrowUpRight size={12} />
-                              </a>
-                            )}
+                            {(() => {
+                              const siteUrl = (pub.Journal_Homepage && pub.Journal_Homepage.startsWith('http')) 
+                                ? pub.Journal_Homepage 
+                                : (pub.DOI && pub.DOI !== '-' && !pub.DOI.includes(' ') ? (pub.DOI.startsWith('http') ? pub.DOI : `https://doi.org/${pub.DOI}`) : null);
+                              return siteUrl ? (
+                                <a href={siteUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-blue-hover)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '6px', fontWeight: 600 }}>
+                                  Source Site <IconArrowUpRight size={12} />
+                                </a>
+                              ) : null;
+                            })()}
                           </td>
                         <td style={{ padding: '16px 18px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <span className={`badge-${(pub.Scopus_Quartile || 'none').toLowerCase()}`}>
@@ -888,6 +893,11 @@ export default function App() {
                             )}
                             {pub.SCImago_Proof_Link && pub.SCImago_Proof_Link.startsWith('http') && (
                               <a href={pub.SCImago_Proof_Link} target="_blank" rel="noreferrer" style={{ color: '#34D399', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>SCImago SJR <IconArrowUpRight size={11} /></a>
+                            )}
+                            {(!pub.Clarivate_MJL_Proof_Link || !pub.Clarivate_MJL_Proof_Link.startsWith('http')) &&
+                             (!pub.Scopus_Proof_Link || !pub.Scopus_Proof_Link.startsWith('http')) &&
+                             (!pub.SCImago_Proof_Link || !pub.SCImago_Proof_Link.startsWith('http')) && (
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>No External Proof</span>
                             )}
                           </div>
                         </td>

@@ -238,23 +238,28 @@ def scrape_vidwan_qualifications(profile_url: str, session: requests.Session | N
 
 def resolve_doi_by_title(title: str) -> str | None:
     """
-    Fallback resolver to search Crossref when a publication has a title but lacks an explicit DOI on Vidwan.
+    Robust resolver to search Crossref when a publication lacks an explicit DOI on Vidwan.
+    Uses token set similarity across multiple candidates.
     """
-    if not title or len(title.strip()) < 10:
+    if not title or len(title.strip()) < 8:
         return None
     try:
-        url = f"https://api.crossref.org/works?query.bibliographic={quote(title.strip())}&rows=1"
+        clean_q = re.sub(r"[^\w\s-]", " ", title.strip())
+        url = f"https://api.crossref.org/works?query.title={quote(clean_q)}&rows=3"
         headers = {"User-Agent": USER_AGENT}
         resp = requests.get(url, headers=headers, timeout=8)
         if resp.status_code == 200:
             items = resp.json().get("message", {}).get("items", [])
-            if items:
-                cand = items[0]
+            target_tokens = set(re.findall(r"\w{3,}", title.lower()))
+            for cand in items:
                 cand_title = cand.get("title", [""])[0] if cand.get("title") else ""
-                if cand_title and (
-                    title.lower()[:30] in cand_title.lower()
-                    or cand_title.lower()[:30] in title.lower()
-                ):
+                if not cand_title:
+                    continue
+                cand_tokens = set(re.findall(r"\w{3,}", cand_title.lower()))
+                if not cand_tokens or not target_tokens:
+                    continue
+                overlap = len(target_tokens & cand_tokens) / max(len(target_tokens), 1)
+                if overlap >= 0.50:
                     return cand.get("DOI")
     except Exception:
         pass
@@ -620,6 +625,41 @@ def fetch_source_details(source_id_url: str, issn: str) -> dict:
     return metrics
 
 
+def sanitize_homepage_url(url: str | None, doi: str | None = None) -> str:
+    """
+    Sanitizes journal homepage URLs to prevent broken links, 404s, and dead paths.
+    Falls back to DOI publisher landing page if available.
+    """
+    clean_doi = str(doi).strip() if doi and str(doi).strip() not in ["-", "N/A", "None", ""] else None
+    doi_landing = (clean_doi if clean_doi.startswith("http") else f"https://doi.org/{clean_doi}") if clean_doi else "N/A"
+
+    if not url or str(url).strip() in ["N/A", "None", "-", ""]:
+        return doi_landing
+
+    url_str = str(url).strip()
+    
+    # Normalize protocol & upgrade to https for major publishers
+    if url_str.startswith("http://"):
+        if any(dom in url_str for dom in ["springer.com", "elsevier.com", "wiley.com", "sciencedirect.com", "oup.com", "nature.com", "iop.org", "ieee.org", "frontiersin.org", "mdpi.com"]):
+            url_str = "https://" + url_str[7:]
+
+    # Fix obsolete journals.elsevier.com redirect paths
+    if "journals.elsevier.com" in url_str:
+        parts = [p for p in url_str.rstrip("/").split("/") if p]
+        slug = parts[-1] if parts else ""
+        if slug and not slug.isdigit():
+            return f"https://www.sciencedirect.com/journal/{slug}"
+        elif len(parts) >= 2 and not parts[-2].isdigit():
+            return f"https://www.sciencedirect.com/journal/{parts[-2]}"
+        return "https://www.sciencedirect.com"
+
+    # Fix known dead deep paths that return 404
+    if "warse.org" in url_str and ".html" in url_str:
+        return "http://www.warse.org"
+
+    return url_str
+
+
 def process_article(
     raw_link: str,
     hint_doc_type: str = "",
@@ -796,11 +836,12 @@ def process_article(
     source_id_url = source.get("id") if source else None
     source_details = fetch_source_details(source_id_url, primary_issn)
 
-    record["Journal_Homepage"] = (
+    raw_homepage = (
         source_details.get("homepage")
         if source_details.get("homepage") != "N/A"
         else ((source.get("homepage_url") if source else None) or "N/A")
     )
+    record["Journal_Homepage"] = sanitize_homepage_url(raw_homepage, doi)
     record["Journal_H_Index"] = source_details.get("h_index", "N/A")
 
     # Quartile estimation based on H-Index tier mapping
@@ -856,18 +897,37 @@ def process_article(
         cites = cr_data.get("is-referenced-by-count", 0)
     record["Article_Citations"] = cites if cites is not None else 0
 
-    # Indexing Proof Links
-    if primary_issn:
-        clean_issn = primary_issn.replace("-", "").strip()
-        record["Clarivate_MJL_Proof_Link"] = f"https://mjl.clarivate.com/search-results?issn={primary_issn}"
-        record["Scopus_Proof_Link"] = f"https://www.scopus.com/sourceid/sourceInfo.uri?issn={clean_issn}"
-        record["SCImago_Proof_Link"] = f"https://www.scimagojr.com/journalsearch.php?q={clean_issn}"
-        record["Indexing_Status"] = "Scopus Verified | SCI/SCIE (Verify on Clarivate MJL)"
+    # Format ISSN into standard XXXX-XXXX if valid 8-character string
+    clean_issn_digits = re.sub(r"[^0-9Xx]", "", str(primary_issn))
+    formatted_issn = f"{clean_issn_digits[:4]}-{clean_issn_digits[4:]}" if len(clean_issn_digits) == 8 else primary_issn.strip()
+
+    # Indexing Proof Links: Scopus, SCImago, and Clarivate MJL
+    # Scopus: Use public Sources search endpoint (avoids 'Source not found' invalid source ID error)
+    if formatted_issn and formatted_issn != "-":
+        record["Scopus_Proof_Link"] = f"https://www.scopus.com/sources?issn={formatted_issn}"
+        record["SCImago_Proof_Link"] = f"https://www.scimagojr.com/journalsearch.php?q={formatted_issn}"
+
+        # Clarivate MJL: Only link for Journal Articles (Clarivate MJL does not index books, book chapters, or patents)
+        if record["Document_Type"] == "Journal Article":
+            record["Clarivate_MJL_Proof_Link"] = f"https://mjl.clarivate.com/search-results?issn={formatted_issn}"
+            record["Indexing_Status"] = "Scopus Verified | SCI/SCIE (Verify on Clarivate MJL)"
+        else:
+            record["Clarivate_MJL_Proof_Link"] = "N/A"
+            record["Indexing_Status"] = f"Scopus Verified ({record['Document_Type']})"
     elif record["ISBN"] != "-":
         record["Indexing_Status"] = f"ISBN Indexed ({record['Document_Type']})"
         record["Clarivate_MJL_Proof_Link"] = "N/A"
-        record["Scopus_Proof_Link"] = "https://www.scopus.com/search/form.uri?display=basic#basic"
-        record["SCImago_Proof_Link"] = "N/A"
+        if journal_name and journal_name not in ["-", "N/A", "Patent Office"]:
+            record["Scopus_Proof_Link"] = f"https://www.scopus.com/sources?searchTerms={quote(journal_name)}"
+            record["SCImago_Proof_Link"] = f"https://www.scimagojr.com/journalsearch.php?q={quote(journal_name)}"
+        else:
+            record["Scopus_Proof_Link"] = "https://www.scopus.com/sources"
+            record["SCImago_Proof_Link"] = "N/A"
+    elif journal_name and journal_name not in ["-", "N/A", "Patent Office"]:
+        record["Indexing_Status"] = f"{record['Document_Type']}"
+        record["Clarivate_MJL_Proof_Link"] = "N/A"
+        record["Scopus_Proof_Link"] = f"https://www.scopus.com/sources?searchTerms={quote(journal_name)}"
+        record["SCImago_Proof_Link"] = f"https://www.scimagojr.com/journalsearch.php?q={quote(journal_name)}"
     else:
         record["Indexing_Status"] = f"{record['Document_Type']}" if record["Document_Type"] != "Journal Article" else "No ISSN/ISBN Available"
         record["Clarivate_MJL_Proof_Link"] = "N/A"
@@ -1011,8 +1071,9 @@ def process_faculty(
             if not rec.get("Article_Title") or rec.get("Article_Title") == "N/A":
                 rec["Article_Title"] = title
         else:
+            search_title_url = f"https://scholar.google.com/scholar?q={quote(title)}" if title and title != "Untitled" else purl
             rec = {
-                "Input_URL": pub.get("raw_url") or purl,
+                "Input_URL": pub.get("raw_url") or search_title_url,
                 "DOI": "-",
                 "Document_Type": doc_type or "Publication",
                 "Article_Title": title,
